@@ -16,7 +16,7 @@ def _e(value) -> str:
     return html.escape(str(value))
 
 
-def render_html(data: dict) -> str:
+def render_html(data: dict, include_toggle: bool = True) -> str:
     """Build and return a complete, self-contained HTML string for a CV."""
 
     personal: dict = data.get("personal") or {}
@@ -31,52 +31,82 @@ def render_html(data: dict) -> str:
     # CSS
     # ------------------------------------------------------------------
     css = """
+        :root {
+            --bg: #fff;
+            --text: #222;
+            --text-sub: #555;
+            --text-muted: #444;
+            --accent: #2c4a7c;
+            --rule: #e0e0e0;
+        }
+        body.dark {
+            --bg: #1a1a1a;
+            --text: #e8e8e8;
+            --text-sub: #aaa;
+            --text-muted: #bbb;
+            --accent: #6b9bd2;
+            --rule: #3a3a3a;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
             font-size: 11px;
             line-height: 1.5;
-            color: #222;
-            background: #fff;
+            color: var(--text);
+            background: var(--bg);
             max-width: 800px;
             margin: 0 auto;
             padding: 36px 40px;
+            transition: background 0.2s, color 0.2s;
         }
+        /* ---- Theme toggle ---- */
+        #theme-toggle {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            padding: 4px 8px;
+            font-size: 16px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            line-height: 1;
+        }
+        #theme-toggle:hover { opacity: 0.8; }
         /* ---- Header ---- */
         #header { margin-bottom: 14px; }
         #header h1 {
             font-size: 26px;
             font-weight: 700;
-            color: #222;
+            color: var(--text);
             margin-bottom: 2px;
         }
         #header .title {
             font-size: 13px;
-            color: #555;
+            color: var(--text-sub);
             margin-bottom: 6px;
         }
         #header .contact {
             font-size: 10px;
-            color: #444;
+            color: var(--text-muted);
         }
         #header .contact span { margin-right: 14px; }
         .header-rule {
             border: none;
-            border-top: 2px solid #2c4a7c;
+            border-top: 2px solid var(--accent);
             margin: 10px 0 18px 0;
         }
         /* ---- Sections ---- */
         .section { margin-bottom: 16px; }
         .section-rule {
             border: none;
-            border-top: 1px solid #e0e0e0;
+            border-top: 1px solid var(--rule);
             margin: 10px 0 10px 0;
         }
         .section-title {
             font-size: 11px;
             font-variant: small-caps;
             letter-spacing: 0.1em;
-            color: #2c4a7c;
+            color: var(--accent);
             font-weight: 700;
             text-transform: lowercase;
             margin-bottom: 8px;
@@ -89,8 +119,8 @@ def render_html(data: dict) -> str:
             align-items: baseline;
         }
         .job-title { font-weight: 700; font-size: 11px; }
-        .job-meta { font-size: 10px; color: #555; text-align: right; }
-        .job-company { font-size: 11px; color: #444; margin-bottom: 2px; }
+        .job-meta { font-size: 10px; color: var(--text-sub); text-align: right; }
+        .job-company { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
         .job ul { margin: 4px 0 0 16px; }
         .job ul li { margin-bottom: 2px; }
         /* ---- Education ---- */
@@ -101,8 +131,8 @@ def render_html(data: dict) -> str:
             align-items: baseline;
         }
         .edu-degree { font-weight: 700; }
-        .edu-year { font-size: 10px; color: #555; }
-        .edu-institution { font-size: 10px; color: #444; }
+        .edu-year { font-size: 10px; color: var(--text-sub); }
+        .edu-institution { font-size: 10px; color: var(--text-muted); }
         /* ---- Skills ---- */
         .skill-row { margin-bottom: 3px; }
         .skill-category { font-weight: 700; }
@@ -115,6 +145,7 @@ def render_html(data: dict) -> str:
         }
         .cert-list li::after, .lang-list li::after { content: " · "; }
         .cert-list li:last-child::after, .lang-list li:last-child::after { content: ""; }
+        a { color: var(--accent); }
     """
 
     # ------------------------------------------------------------------
@@ -142,7 +173,7 @@ def render_html(data: dict) -> str:
     if personal.get("linkedin"):
         linkedin_val = personal["linkedin"]
         if linkedin_val.startswith("https://") or linkedin_val.startswith("http://"):
-            linkedin_display = f'<a href="{linkedin_val}" style="color: #2c4a7c;">{_e(linkedin_val)}</a>'
+            linkedin_display = f'<a href="{linkedin_val}">{_e(linkedin_val)}</a>'
         else:
             linkedin_display = _e(linkedin_val)
         contact_parts.append(f'<span>&#128279; {linkedin_display}</span>')
@@ -269,6 +300,28 @@ def render_html(data: dict) -> str:
         + certifications_html
     )
 
+    toggle_html = ""
+    toggle_js = ""
+    if include_toggle:
+        toggle_html = '<button id="theme-toggle">&#127866;</button>'
+        toggle_js = """
+<script>
+(function() {
+  var btn = document.getElementById('theme-toggle');
+  var dark = localStorage.getItem('theme') === 'dark';
+  function apply() {
+    document.body.classList.toggle('dark', dark);
+    btn.textContent = dark ? '\u2600\ufe0f' : '\U0001F31A';
+  }
+  apply();
+  btn.addEventListener('click', function() {
+    dark = !dark;
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+    apply();
+  });
+})();
+</script>"""
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -280,7 +333,9 @@ def render_html(data: dict) -> str:
 </style>
 </head>
 <body>
+{toggle_html}
 {body_content}
+{toggle_js}
 </body>
 </html>
 """
@@ -305,21 +360,20 @@ def generate(yaml_path: str, formats: str = "both") -> list[str]:
     if not isinstance(data, dict):
         raise SystemExit(f"Error: '{yaml_path}' is empty or not a valid YAML document.")
 
-    html_string = render_html(data)
     base, _ = os.path.splitext(yaml_path)
     written = []
 
     if formats in ("html", "both"):
         html_path = base + ".html"
         with open(html_path, "w", encoding="utf-8") as fh:
-            fh.write(html_string)
+            fh.write(render_html(data, include_toggle=True))
         written.append(html_path)
 
     if formats in ("pdf", "both"):
         import weasyprint  # lazy import — only needed for PDF generation
         pdf_path = base + ".pdf"
         weasyprint.HTML(
-            string=html_string,
+            string=render_html(data, include_toggle=False),
             base_url=os.path.dirname(os.path.abspath(yaml_path)),
         ).write_pdf(pdf_path)
         written.append(pdf_path)
